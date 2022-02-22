@@ -1430,10 +1430,11 @@ if __name__ == '__main__':
 
     # variables
     number = 100
+    processors = 1
 
     # =====args=====
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hs:u:b:n:")
+        opts, args = getopt.getopt(sys.argv[1:], "hs:u:b:n:p:")
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
@@ -1446,12 +1447,14 @@ if __name__ == '__main__':
             sys.exit()
         elif opt in ('-s', '--switch'):  # define which part of the code is being executed
             code_switch = int(arg)
-        elif opt == ('-u', '--util', '--utilization'):  # utilization
+        elif opt in ('-u', '--util', '--utilization'):  # utilization
             util = float(arg)
         elif opt in ('-b', '--bench', '--benchmark'):
             benchmark = str(arg)
-        elif opt in ('-n',):
+        elif opt in ('-n', '--number'):
             number = int(arg)
+        elif opt in ('-p', '--proc', 'processors'):
+            processors = int(arg)
 
     # single ecu system synthesis
     if code_switch == 1:
@@ -1490,7 +1493,7 @@ if __name__ == '__main__':
             ana.davare([ce])
 
         # Main: Generate the schedule
-        with Pool(args.p) as p:
+        with Pool(processors) as p:
             schedules_lst = p.map(schedule_taskset_as_list, ce_ts)
         schedules_dict = []
         for idxx, sched in enumerate(schedules_lst):
@@ -1506,11 +1509,18 @@ if __name__ == '__main__':
                        for cets, sched in zip(ce_ts, schedules)]
         # Note: Each entry is now a 3-tuple of list of cause-effect chain,
         # corresponding task set, and corresponding schedule
+        # - ce_ts_sched
+        #   - ce_ts_sched[0] --> one ECU
+        #     - ce_ts_sched[0][0] = set of ce-chains
+        #     - ce_ts_sched[0][1] = set of tasks (one ECU!)
+        #     - ce_ts_sched[0][2] = schedule of that ECU as dictionary
+        #   - ce_ts_sched[1]
+        #   - ...
 
         # == Save the results
         print("= Save data")
         check_or_make_directory('output/1generation')
-        write_data(f'ce_ts_sched_u={util}_n={number}_g={benchmark}', None)
+        write_data(f'output/1generation/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
 
     # inter-ecu system synthesis
 
