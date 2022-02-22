@@ -9,6 +9,8 @@ import gc  # garbage collector
 import argparse
 import getopt
 import math
+import re
+
 import numpy as np
 import utilities.chain as c
 import utilities.communication as comm
@@ -1520,14 +1522,51 @@ if __name__ == '__main__':
         # == Save the results
         print("= Save data")
         check_or_make_directory('output/1generation')
-        write_data(f'output/1generation/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
+        write_data(f'output/1generation/single_ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
 
     # inter-ecu system synthesis
     if code_switch == 2:
-        pass
+
+        # == get all filenames
+        filenames = os.listdir('output/1generation/.')
+        pattern = re.compile('single.*\.pkl')
+        filenames = [file for file in filenames if pattern.match(file)]
+
+        # == load data and combine
+        single_ce_ts_sched_flat = []
+        for file in filenames:
+            single_ce_ts_sched_flat.extend(flatten(load_data(file)))
+
+        # == make interconnected chains
+        inter_chains = []
+        number_interconn_ce_chains = 1  # TODO
+        for j in range(0, number_interconn_ce_chains):
+            com_tasks = comm.generate_communication_taskset(20, 10, 1000, True)  # generate communication tasks
+            com_tasks = list(np.random.choice(com_tasks, 4, replace=False))  # randomly choose 4
+            ces = list(np.random.choice(single_ce_ts_sched_flat, 5, replace=False))  # randomly choose 5
+            inter_chains.add([
+                ces[0],
+                com_tasks[0],
+                ces[1],
+                com_tasks[1],
+                ces[2],
+                com_tasks[2],
+                ces[3],
+                com_tasks[3],
+                ces[4],
+            ])
+            # End user notification
+            if j % 100 == 0:
+                print("\t", j)
+
+        # == Save the results
+        print("= Save data")
+        check_or_make_directory('output/1generation')
+        write_data(f'output/1generation/inter_chains.pkl', inter_chains)
+
 
     # single ecu experiment
-    elif args.j == 3:
+    elif code_switch == 3:
 
         # == Check parameters
 
@@ -1600,17 +1639,7 @@ if __name__ == '__main__':
         # == Save the results
         print("= Save data")
         check_or_make_directory('output/2implicit')
-        write_data(f'output/1generation/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
-
-        print(time_now(), '= Store data =')
-
-        folder = "output/2implicit/"
-        output_filename = ("ce_ts_sched_u=" + str(args.u) +
-                           "_n=" + str(args.n) + "_g=" + str(args.g) + ".npz")
-        check_folder(folder)
-        np.savez(folder + output_filename, gen=ce_ts_sched)
-
-        print(time_now(), '= Done =')
+        write_data(f'output/2implicit/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
 
     # single ecu plotting
 
