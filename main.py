@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluation for the paper 'Timing Analysis of Asynchronized Distributed
-Cause-Effect Chains' (2021).
+"""Evaluation for the paper TODO .
 
 It includes (1) local analysis (2) global analysis and (3) plotting of the
 results.
@@ -8,6 +7,7 @@ results.
 
 import gc  # garbage collector
 import argparse
+import getopt
 import math
 import numpy as np
 import utilities.chain as c
@@ -23,17 +23,13 @@ import utilities.evaluation as eva
 import time
 import sys
 import os
+import pickle  # save and load
 
 import random  # randomization
 from multiprocessing import Pool  # multiprocessing
 import itertools  # better performance
 
-
 debug_flag = True  # flag to have breakpoint() when errors occur
-
-# set seed for same results
-random.seed(331)
-np.random.seed(331)
 
 
 ########################
@@ -54,7 +50,7 @@ def task_set_generate(argsg, argsu, argsr):
     - argsr = number of task sets to generate
     Output: list of task sets.'''
     try:
-        if argsg == 0:
+        if argsg == 'waters':
             # WATERS benchmark
             print("WATERS benchmark.")
 
@@ -64,7 +60,7 @@ def task_set_generate(argsg, argsu, argsr):
                        0.25 / 0.85, 0.03 / 0.85, 0.2 / 0.85, 0.01 / 0.85,
                        0.04 / 0.85]
             # Required utilization:
-            req_uti = argsu/100.0
+            req_uti = argsu / 100.0
             # Maximal difference between required utilization and actual
             # utilization is set to 1 percent:
             threshold = 1.0
@@ -75,7 +71,7 @@ def task_set_generate(argsg, argsu, argsr):
             task_sets_waters = []
             while len(task_sets_waters) < argsr:
                 task_sets_gen = waters.gen_tasksets(
-                    1, req_uti, profile, True, threshold/100.0, 4)
+                    1, req_uti, profile, True, threshold / 100.0, 4)
                 task_sets_waters.append(task_sets_gen[0])
 
             # Transform tasks to fit framework structure.
@@ -83,7 +79,7 @@ def task_set_generate(argsg, argsu, argsr):
             trans1 = trans.Transformer("1", task_sets_waters, 10000000)
             task_sets = trans1.transform_tasks(False)
 
-        elif argsg == 1:
+        elif argsg == 'uunifast':
             # UUniFast benchmark.
             print("UUniFast benchmark.")
 
@@ -105,7 +101,7 @@ def task_set_generate(argsg, argsu, argsr):
             max_pull = 2000
 
             task_sets_uunifast = uunifast.gen_tasksets_pred(
-                50, argsr, min_pull, max_pull, argsu/100.0, periods)
+                50, argsr, min_pull, max_pull, argsu / 100.0, periods)
 
             # Transform tasks to fit framework structure.
             trans2 = trans.Transformer("2", task_sets_uunifast, 10000000)
@@ -171,9 +167,9 @@ def schedule_task_set(ce_chains, task_set, print_status=False):
         hyper_period = a.Analyzer.determine_hyper_period(task_set)
 
         sched_interval = (
-            2 * hyper_period + max_phase  # interval from paper
-            + latency_upper_bound  # upper bound job chain length
-            + max_period)  # for convenience
+                2 * hyper_period + max_phase  # interval from paper
+                + latency_upper_bound  # upper bound job chain length
+                + max_period)  # for convenience
 
         if print_status:
             # Information for end user.
@@ -181,13 +177,13 @@ def schedule_task_set(ce_chains, task_set, print_status=False):
             print("\tHyperperiod: ", hyper_period)
             number_of_jobs = 0
             for task in task_set:
-                number_of_jobs += sched_interval/task.period
+                number_of_jobs += sched_interval / task.period
             print("\tNumber of jobs to schedule: ",
                   "%.2f" % number_of_jobs)
 
         # Stop condition: Number of jobs of lowest priority task.
         simulator.dispatcher(
-            int(math.ceil(sched_interval/task_set[-1].period)))
+            int(math.ceil(sched_interval / task_set[-1].period)))
 
         # Simulation without early completion.
         schedule = simulator.e2e_result()
@@ -237,6 +233,7 @@ def check_folder(name):
 # Help functions for Analysis #
 ###############################
 ana = a.Analyzer()
+
 
 # Note:
 # lst_flat = (ce, ts, sched)
@@ -395,7 +392,7 @@ def analyze_mixed_mrda(lst_inter, scenario):
 
 def divide_chain_4(chain, nmb):
     '''divides chain into two parts, where the cut is at nmb/4-th.'''
-    cut_at = int(len(chain.chain)*nmb/4)
+    cut_at = int(len(chain.chain) * nmb / 4)
     c1 = c.CauseEffectChain(1, chain.chain[:cut_at])
     c2 = c.CauseEffectChain(2, chain.chain[cut_at:])
     return (c1, c2)
@@ -406,6 +403,7 @@ def cut_chain(ce_ts_sched_entry, nmb):
     ce, ts, sched = ce_ts_sched_entry
     ce1, ce2 = divide_chain_4(ce, nmb)
     return ((ce1, ts, sched), (ce2, ts, sched))
+
 
 #################
 # Main function #
@@ -463,8 +461,6 @@ def main():
         assert len(task_sets) == len(ce_chains)
         ce_ts = list(zip(ce_chains, task_sets))
 
-        # breakpoint()
-
         ###
         # Schedule generation
         ###
@@ -490,30 +486,12 @@ def main():
 
         schedules = schedules_dict
 
-        # breakpoint()
-
-        # for entry in ce_ts:
-        #     sched1 = schedule_task_set(*entry)
-        #     with Pool(1) as p:
-        #         sched2 = p.map(schedule_taskset_as_list, [entry])
-        #     sched2 = sched2[0]
-        #     # sched2 = schedule_taskset_as_list(entry)
-        #     sched3 = dict()
-        #     for t, s in zip(entry[1], sched2):
-        #         sched3[t] = s
-        #     breakpoint()
-        # with Pool(args.p) as p:
-        #     schedules = p.starmap(schedule_task_set, ce_ts)
-        # schedules = [schedule_task_set(ts, ce) for ce, ts in ce_ts]
-
         # match ce_ts with schedules:
         assert len(ce_ts) == len(schedules)
         ce_ts_sched = [cets + (sched,)
                        for cets, sched in zip(ce_ts, schedules)]
         # Note: Each entry is now a 3-tuple of list of cause-effect chain,
         # corresponding task set, and corresponding schedule
-
-        # breakpoint()
 
         ###
         # Save the results
@@ -522,7 +500,7 @@ def main():
 
         try:
             folder = "output/1generation/"
-            filename = ("ce_ts_sched_u="+str(args.u) +
+            filename = ("ce_ts_sched_u=" + str(args.u) +
                         "_n=" + str(args.n) + "_g=" + str(args.g) + ".npz")
             check_folder(folder)
             np.savez(folder + filename, gen=ce_ts_sched)
@@ -550,7 +528,7 @@ def main():
         ###
         print(time_now(), "= Load data =")
 
-        filename = ("output/1generation/ce_ts_sched_u="+str(args.u)
+        filename = ("output/1generation/ce_ts_sched_u=" + str(args.u)
                     + "_n=" + str(args.n)
                     + "_g=" + str(args.g) + ".npz")
         data = np.load(filename, allow_pickle=True)
@@ -703,7 +681,7 @@ def main():
         output_filename = ("ce_ts_sched_u=" + str(args.u) +
                            "_n=" + str(args.n) + "_g=" + str(args.g) + ".npz")
         check_folder(folder)
-        np.savez(folder+output_filename, gen=ce_ts_sched)
+        np.savez(folder + output_filename, gen=ce_ts_sched)
 
         print(time_now(), '= Done =')
 
@@ -733,7 +711,7 @@ def main():
         ###
         print(time_now(), "= Load data =")
 
-        filename = ("output/2implicit/ce_ts_sched_u="+str(args.u)
+        filename = ("output/2implicit/ce_ts_sched_u=" + str(args.u)
                     + "_n=" + str(args.n)
                     + "_g=" + str(args.g) + ".npz")
         data = np.load(filename, allow_pickle=True)
@@ -828,7 +806,7 @@ def main():
         output_filename = ("inter_res_u=" + str(args.u) +
                            "_n=" + str(args.n) + "_g=" + str(args.g) + ".npz")
         check_folder(folder)
-        np.savez(folder+output_filename,
+        np.savez(folder + output_filename,
                  result=final_results, scenarios=scenarios)
 
         print(time_now(), '= Done =')
@@ -846,7 +824,7 @@ def main():
         ###
         print(time_now(), "= Load data =")
 
-        filename = ("output/2implicit/ce_ts_sched_u="+str(args.u)
+        filename = ("output/2implicit/ce_ts_sched_u=" + str(args.u)
                     + "_n=" + str(args.n)
                     + "_g=" + str(args.g) + ".npz")
         data = np.load(filename, allow_pickle=True)
@@ -998,7 +976,7 @@ def main():
         output_filename = ("intra_res_u=" + str(args.u) +
                            "_n=" + str(args.n) + "_g=" + str(args.g) + ".npz")
         check_folder(folder)
-        np.savez(folder+output_filename,
+        np.savez(folder + output_filename,
                  result=final_results, scenarios=scenarios)
 
         print(time_now(), '= Done =')
@@ -1011,7 +989,7 @@ def main():
         print(time_now(), "= Load data =")
 
         # == files from implicit communication evaluation
-        filename_implicit = ("output/2implicit/ce_ts_sched_u="+str(args.u)
+        filename_implicit = ("output/2implicit/ce_ts_sched_u=" + str(args.u)
                              + "_n=" + str(args.n)
                              + "_g=" + str(args.g) + ".npz")
         data_implicit = np.load(filename_implicit, allow_pickle=True)
@@ -1020,7 +998,7 @@ def main():
         ce_ts_sched_implicit_flat = flatten(ce_ts_sched_implicit)
 
         # == files from mixed local evaluation
-        filename_ml = ("output/4mixedintra/intra_res_u="+str(args.u)
+        filename_ml = ("output/4mixedintra/intra_res_u=" + str(args.u)
                        + "_n=" + str(args.n)
                        + "_g=" + str(args.g) + ".npz")
         data_ml = np.load(filename_ml, allow_pickle=True)
@@ -1029,7 +1007,7 @@ def main():
         sce_ml = data_ml.f.scenarios
 
         # == files from mixed global evaluation
-        filename_mg = ("output/3mixedinter/inter_res_u="+str(args.u)
+        filename_mg = ("output/3mixedinter/inter_res_u=" + str(args.u)
                        + "_n=" + str(args.n)
                        + "_g=" + str(args.g) + ".npz")
         data_mg = np.load(filename_mg, allow_pickle=True)
@@ -1068,44 +1046,44 @@ def main():
         # MRT
         myeva.boxplot_impl(
             [ch for ch, _, _ in ce_ts_sched_implicit_flat],
-            folder+"implicit_eval_mrt_u=" +
+            folder + "implicit_eval_mrt_u=" +
             str(args.u) + "_n=" + str(args.n) + "_g=" + str(args.g) + ".pdf",
             ['d19_mrt', 'kloda', 'our0_mrt', 'our1_mrt',
-                'our2_mrt', 'our3_mrt', 'g21_mrt'],
+             'our2_mrt', 'our3_mrt', 'g21_mrt'],
             ['D19', 'K18', '0.0', '0.3', '0.7', '1.0', 'G21']
         )
 
         # MRDA
         myeva.boxplot_impl(
             [ch for ch, _, _ in ce_ts_sched_implicit_flat],
-            folder+"implicit_eval_mrda_u=" +
+            folder + "implicit_eval_mrda_u=" +
             str(args.u) + "_n=" + str(args.n) + "_g=" + str(args.g) + ".pdf",
             ['d19_mrda', 'kloda', 'our0_mrda', 'our1_mrda',
-                'our2_mrda', 'our3_mrda', 'g21_mrda'],
+             'our2_mrda', 'our3_mrda', 'g21_mrda'],
             ['D19', 'K18', '0.0', '0.3', '0.7', '1.0', 'G21']
         )
 
         # MDA
         myeva.boxplot_impl(
             [ch for ch, _, _ in ce_ts_sched_implicit_flat],
-            folder+"implicit_eval_mda_u=" +
+            folder + "implicit_eval_mda_u=" +
             str(args.u) + "_n=" + str(args.n) + "_g=" + str(args.g) + ".pdf",
             ['kloda', 'our0_mda', 'our1_mda',
-                'our2_mda', 'our3_mda', 'g21_mda'],
+             'our2_mda', 'our3_mda', 'g21_mda'],
             ['K18', '0.0', '0.3', '0.7', '1.0', 'G21']
         )
 
         # == Mixed local
         # MRT:
         ml_mrt_val = [
-            [(e/eimpl) for e, eimpl in zip(entry[0], res_ml[0][0])] for entry in res_ml[1:]]
+            [(e / eimpl) for e, eimpl in zip(entry[0], res_ml[0][0])] for entry in res_ml[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(ml_mrt_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_local_mrt_u=" +
+            folder + "mixed_local_mrt_u=" +
             str(args.u) + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[1.0, 2.0, 3.0, 4.0],
@@ -1114,7 +1092,7 @@ def main():
 
         # MDA:
         ml_mda_val = [
-            [(e/eimpl) for e, eimpl in zip(entry[1], res_ml[0][1])] for entry in res_ml[1:]]
+            [(e / eimpl) for e, eimpl in zip(entry[1], res_ml[0][1])] for entry in res_ml[1:]]
 
         # for entry in ml_mda_val[0]:
         #     if entry < 1:
@@ -1125,7 +1103,7 @@ def main():
         myeva.boxplot_values(
             list(ml_mda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_local_mda_u=" +
+            folder + "mixed_local_mda_u=" +
             str(args.u) + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[1.0, 2.0, 3.0, 4.0],
@@ -1134,14 +1112,14 @@ def main():
 
         # MRDA:
         ml_mrda_val = [
-            [(e/eimpl) for e, eimpl in zip(entry[2], res_ml[0][2])] for entry in res_ml[1:]]
+            [(e / eimpl) for e, eimpl in zip(entry[2], res_ml[0][2])] for entry in res_ml[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(ml_mrda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_local_mrda_u=" +
+            folder + "mixed_local_mrda_u=" +
             str(args.u) + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[1.0, 2.0, 3.0, 4.0],
@@ -1151,14 +1129,14 @@ def main():
         # == Mixed global
         # MRT:
         mg_mrt_val = [
-            [(e/eimpl) for e, eimpl in zip(entry[0], res_mg[0][0])] for entry in res_mg[1:]]
+            [(e / eimpl) for e, eimpl in zip(entry[0], res_mg[0][0])] for entry in res_mg[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(mg_mrt_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_global_mrt_u=" +
+            folder + "mixed_global_mrt_u=" +
             str(args.u) + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[1.0, 2.0, 3.0, 4.0],
@@ -1167,14 +1145,14 @@ def main():
 
         # MDA:
         mg_mda_val = [
-            [(e/eimpl) for e, eimpl in zip(entry[1], res_mg[0][1])] for entry in res_mg[1:]]
+            [(e / eimpl) for e, eimpl in zip(entry[1], res_mg[0][1])] for entry in res_mg[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(mg_mda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_global_mda_u=" +
+            folder + "mixed_global_mda_u=" +
             str(args.u) + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[1.0, 2.0, 3.0, 4.0],
@@ -1183,14 +1161,14 @@ def main():
 
         # MRDA:
         mg_mrda_val = [
-            [(e/eimpl) for e, eimpl in zip(entry[2], res_mg[0][2])] for entry in res_mg[1:]]
+            [(e / eimpl) for e, eimpl in zip(entry[2], res_mg[0][2])] for entry in res_mg[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(mg_mrda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_global_mrda_u=" +
+            folder + "mixed_global_mrda_u=" +
             str(args.u) + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[1.0, 2.0, 3.0, 4.0],
@@ -1225,7 +1203,7 @@ def main():
         for util in ['50.0', '60.0', '70.0', '80.0', '90.0']:
 
             # == files from implicit communication evaluation
-            filename_implicit = ("output/2implicit/ce_ts_sched_u="+str(util)
+            filename_implicit = ("output/2implicit/ce_ts_sched_u=" + str(util)
                                  + "_n=" + str(args.n)
                                  + "_g=" + str(args.g) + ".npz")
             data_implicit = np.load(filename_implicit, allow_pickle=True)
@@ -1234,7 +1212,7 @@ def main():
             ce_ts_sched_implicit_flat.extend(flatten(data_implicit.f.gen))
 
             # == files from mixed local evaluation
-            filename_ml = ("output/4mixedintra/intra_res_u="+str(util)
+            filename_ml = ("output/4mixedintra/intra_res_u=" + str(util)
                            + "_n=" + str(args.n)
                            + "_g=" + str(args.g) + ".npz")
             data_ml = np.load(filename_ml, allow_pickle=True)
@@ -1244,7 +1222,7 @@ def main():
                     res_ml[idx][idy].extend(data_ml.f.result[idx][idy])
 
             # == files from mixed global evaluation
-            filename_mg = ("output/3mixedinter/inter_res_u="+str(util)
+            filename_mg = ("output/3mixedinter/inter_res_u=" + str(util)
                            + "_n=" + str(args.n)
                            + "_g=" + str(args.g) + ".npz")
             data_mg = np.load(filename_mg, allow_pickle=True)
@@ -1284,10 +1262,10 @@ def main():
         # MRT
         myeva.boxplot_impl(
             [ch for ch, _, _ in ce_ts_sched_implicit_flat],
-            folder+"implicit_eval_mrt" + "_n=" +
+            folder + "implicit_eval_mrt" + "_n=" +
             str(args.n) + "_g=" + str(args.g) + ".pdf",
             ['d19_mrt', 'kloda', 'our0_mrt', 'our1_mrt',
-                'our2_mrt', 'our3_mrt', 'g21_mrt'],
+             'our2_mrt', 'our3_mrt', 'g21_mrt'],
             ['D19', 'K18', '0.0', '0.3', '0.7', '1.0', 'G21'],
             ylabel='Latency Reduction (%)'
         )
@@ -1295,10 +1273,10 @@ def main():
         # MRDA
         myeva.boxplot_impl(
             [ch for ch, _, _ in ce_ts_sched_implicit_flat],
-            folder+"implicit_eval_mrda" + "_n=" +
+            folder + "implicit_eval_mrda" + "_n=" +
             str(args.n) + "_g=" + str(args.g) + ".pdf",
             ['d19_mrda', 'kloda', 'our0_mrda', 'our1_mrda',
-                'our2_mrda', 'our3_mrda', 'g21_mrda'],
+             'our2_mrda', 'our3_mrda', 'g21_mrda'],
             ['D19', 'K18', '0.0', '0.3', '0.7', '1.0', 'G21'],
             ylabel='Latency Reduction (%)'
         )
@@ -1306,10 +1284,10 @@ def main():
         # MDA
         myeva.boxplot_impl(
             [ch for ch, _, _ in ce_ts_sched_implicit_flat],
-            folder+"implicit_eval_mda" + "_n=" +
+            folder + "implicit_eval_mda" + "_n=" +
             str(args.n) + "_g=" + str(args.g) + ".pdf",
             ['kloda', 'our0_mda', 'our1_mda',
-                'our2_mda', 'our3_mda', 'g21_mda'],
+             'our2_mda', 'our3_mda', 'g21_mda'],
             ['K18', '0.0', '0.3', '0.7', '1.0', 'G21'],
             ylabel='Latency Reduction (%)'
         )
@@ -1317,14 +1295,14 @@ def main():
         # == Mixed local
         # MRT:
         ml_mrt_val = [
-            [(e/eimpl)*100 for e, eimpl in zip(entry[0], res_ml[0][0])] for entry in res_ml[1:]]
+            [(e / eimpl) * 100 for e, eimpl in zip(entry[0], res_ml[0][0])] for entry in res_ml[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(ml_mrt_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_local_mrt" + "_n=" + str(args.n) +
+            folder + "mixed_local_mrt" + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[100.0, 200.0, 300.0, 400.0],
             ylimits=[80.0, 420.0],
@@ -1333,7 +1311,7 @@ def main():
 
         # MDA:
         ml_mda_val = [
-            [(e/eimpl)*100 for e, eimpl in zip(entry[1], res_ml[0][1])] for entry in res_ml[1:]]
+            [(e / eimpl) * 100 for e, eimpl in zip(entry[1], res_ml[0][1])] for entry in res_ml[1:]]
 
         # for entry in ml_mda_val[0]:
         #     if entry < 1:
@@ -1344,7 +1322,7 @@ def main():
         myeva.boxplot_values(
             list(ml_mda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_local_mda" + "_n=" + str(args.n) +
+            folder + "mixed_local_mda" + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[100.0, 200.0, 300.0, 400.0],
             ylimits=[80.0, 420.0],
@@ -1353,14 +1331,14 @@ def main():
 
         # MRDA:
         ml_mrda_val = [
-            [(e/eimpl)*100 for e, eimpl in zip(entry[2], res_ml[0][2])] for entry in res_ml[1:]]
+            [(e / eimpl) * 100 for e, eimpl in zip(entry[2], res_ml[0][2])] for entry in res_ml[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(ml_mrda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_local_mrda" + "_n=" + str(args.n) +
+            folder + "mixed_local_mrda" + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[100.0, 200.0, 300.0, 400.0],
             ylimits=[80.0, 420.0],
@@ -1370,14 +1348,14 @@ def main():
         # == Mixed global
         # MRT:
         mg_mrt_val = [
-            [(e/eimpl)*100 for e, eimpl in zip(entry[0], res_mg[0][0])] for entry in res_mg[1:]]
+            [(e / eimpl) * 100 for e, eimpl in zip(entry[0], res_mg[0][0])] for entry in res_mg[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(mg_mrt_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_global_mrt" + "_n=" + str(args.n) +
+            folder + "mixed_global_mrt" + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[100.0, 200.0, 300.0, 400.0],
             ylimits=[80.0, 420.0],
@@ -1386,14 +1364,14 @@ def main():
 
         # MDA:
         mg_mda_val = [
-            [(e/eimpl)*100 for e, eimpl in zip(entry[1], res_mg[0][1])] for entry in res_mg[1:]]
+            [(e / eimpl) * 100 for e, eimpl in zip(entry[1], res_mg[0][1])] for entry in res_mg[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(mg_mda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_global_mda" + "_n=" + str(args.n) +
+            folder + "mixed_global_mda" + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[100.0, 200.0, 300.0, 400.0],
             ylimits=[80.0, 420.0],
@@ -1402,14 +1380,14 @@ def main():
 
         # MRDA:
         mg_mrda_val = [
-            [(e/eimpl)*100 for e, eimpl in zip(entry[2], res_mg[0][2])] for entry in res_mg[1:]]
+            [(e / eimpl) * 100 for e, eimpl in zip(entry[2], res_mg[0][2])] for entry in res_mg[1:]]
 
         # worse than than the case with only implicit
         # breakpoint()
         myeva.boxplot_values(
             list(mg_mrda_val),
             ['1/4', '2/4', '3/4', '4/4'],
-            folder+"mixed_global_mrda" + "_n=" + str(args.n) +
+            folder + "mixed_global_mrda" + "_n=" + str(args.n) +
             "_g=" + str(args.g) + ".pdf",
             yticks=[100.0, 200.0, 300.0, 400.0],
             ylimits=[80.0, 420.0],
@@ -1417,5 +1395,131 @@ def main():
         )
 
 
+# Simple help functions: # TODO outsource to another file
+def print_usage():
+    print('test.py -s <switch>')  # TODO update
+
+
+def check_or_make_directory(dirname):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+        print(f'Directory {dirname} created')
+
+
+def write_data(filename, data):
+    file = open(filename, 'wb')
+    pickle.dump(data, file)
+    file.close()
+    print(f'Data written to {filename}')
+
+
+def load_data(filename):
+    file = open(filename, 'rb')
+    data = pickle.load(file)
+    file.close()
+    print(f'Data loaded from {filename}')
+    return data
+
+
+# Main function
+
 if __name__ == '__main__':
-    main()
+    # set seed for same results
+    random.seed(331)
+    np.random.seed(331)
+
+    # variables
+    number = 100
+
+    # =====args=====
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hs:u:b:n:")
+    except getopt.GetoptError:
+        print_usage()
+        sys.exit(2)
+    if len(opts) == 0:
+        print_usage()
+        sys.exit()
+    for opt, arg in opts:
+        if opt in ('-h', '--help'):
+            print_usage()
+            sys.exit()
+        elif opt in ('-s', '--switch'):  # define which part of the code is being executed
+            code_switch = int(arg)
+        elif opt == ('-u', '--util', '--utilization'):  # utilization
+            util = float(arg)
+        elif opt in ('-b', '--bench', '--benchmark'):
+            benchmark = str(arg)
+        elif opt in ('-n',):
+            number = int(arg)
+
+    # single ecu system synthesis
+    if code_switch == 1:
+        print('=== Single ECU system synthesis')
+
+        # Check parameters
+        assert {'benchmark', 'util', 'number'}.issubset(locals())
+        assert benchmark in ('waters', 'uunifast')
+        assert 0.0 <= util <= 100.0
+
+        # == Create task set.
+        print('= Task set generation')
+        task_sets = task_set_generate(benchmark, util, number)
+
+        # == CE-Chain generation.
+        print('= CE-Chain generation')
+
+        ce_chains = waters.gen_ce_chains(task_sets)
+        # ce_chains contains one set of cause effect chains for each
+        # task set in task_sets.
+
+        # Match both
+        assert len(task_sets) == len(ce_chains)
+        ce_ts = list(zip(ce_chains, task_sets))
+
+        # == Schedule generation
+        print('= Schedule generation')
+
+        # Preparation: TDA (for Davare)
+        # Only take those that are succesful.
+        ce_ts = [entry for entry in ce_ts if TDA(entry[1])]
+
+        # Preparation: Davare (for schedule generation)
+        ana = a.Analyzer()
+        for ce, ts in ce_ts:
+            ana.davare([ce])
+
+        # Main: Generate the schedule
+        with Pool(args.p) as p:
+            schedules_lst = p.map(schedule_taskset_as_list, ce_ts)
+        schedules_dict = []
+        for idxx, sched in enumerate(schedules_lst):
+            schedules_dict.append(dict())
+            for idxxx, tsk in enumerate(ce_ts[idxx][1]):
+                schedules_dict[idxx][tsk] = sched[idxxx][:]
+
+        schedules = schedules_dict
+
+        # match ce_ts with schedules:
+        assert len(ce_ts) == len(schedules)
+        ce_ts_sched = [cets + (sched,)
+                       for cets, sched in zip(ce_ts, schedules)]
+        # Note: Each entry is now a 3-tuple of list of cause-effect chain,
+        # corresponding task set, and corresponding schedule
+
+        # == Save the results
+        print("= Save data")
+        check_or_make_directory('output/1generation')
+        write_data(f'ce_ts_sched_u={util}_n={number}_g={benchmark}', None)
+
+    # inter-ecu system synthesis
+
+    # single ecu experiment
+
+    # single ecu plotting
+
+    # inter-ecu experiment
+
+    # inter-ecu potting
+
+    # main()
