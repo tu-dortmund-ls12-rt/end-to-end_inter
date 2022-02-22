@@ -1460,7 +1460,7 @@ if __name__ == '__main__':
     if code_switch == 1:
         print('=== Single ECU system synthesis')
 
-        # Check parameters
+        # == Check parameters
         assert {'benchmark', 'util', 'number'}.issubset(locals())
         assert benchmark in ('waters', 'uunifast')
         assert 0.0 <= util <= 100.0
@@ -1523,8 +1523,94 @@ if __name__ == '__main__':
         write_data(f'output/1generation/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
 
     # inter-ecu system synthesis
+    if code_switch == 2:
+        pass
 
     # single ecu experiment
+    elif args.j == 3:
+
+        # == Check parameters
+
+        # == Load data
+        print(time_now(), "= Load data")
+        ce_ts_sched = load_data(f'output/1generation/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl')
+        ce_ts_sched_flat = flatten(ce_ts_sched)  # this one is used
+
+        # == Other analyses
+        # - Davare
+        # - Kloda
+        # - D19
+        # - G21
+
+        # ana = a.Analyzer()
+        print(time_now(), '= Other analyses')
+
+        o_analyses = [
+            ['Davare', davare, 'davare'],
+            ['Kloda', kloda, 'kloda'],
+            ['D19: MDA', D19_mda, 'd19_mrda'],
+            ['D19: MRT', D19_mrt, 'd19_mrt'],
+            # ['G21: MDA', G21_mda, 'g21_mda'],
+            # ['G21: MRDA', G21_mrda, 'g21_mrda'],
+            # ['G21: MRT', G21_mrt, 'g21_mrt'],
+        ]
+
+        for name, fct, attr_name in o_analyses:
+            print(time_now(), name)
+
+            # Get result
+            with Pool(processors) as p:
+                results = p.map(fct, ce_ts_sched_flat)
+
+            # Set results
+            assert len(results) == len(ce_ts_sched_flat)
+            for res, entry in zip(results, ce_ts_sched_flat):
+                setattr(entry[0], attr_name, res)
+
+        # == Our analysis
+
+        # Note: given some bcet ratio, make new schedule, analyse, put value to ce chain.
+
+        print(time_now(), '= Our analysis')
+
+        bcet_ratios = [1.0, 0.7, 0.3, 0.0]
+
+        # Add dictionary for each cause-effect chain
+        for ce, _, _ in ce_ts_sched_flat:
+            ce.our_mrt = dict()
+            ce.our_mda = dict()
+            ce.our_mrda = dict()
+
+        for bcet in bcet_ratios:
+            print(time_now(), 'BCET/WCET =', bcet)
+
+            # Get result
+            with Pool(args.p) as p:
+                res_our = p.starmap(our_mrt_mRda, zip(
+                    ce_ts_sched, itertools.repeat(bcet)))
+
+            # Set results
+            assert len(res_our) == len(ce_ts_sched)
+            for res, entry in zip(res_our, ce_ts_sched):
+                for idxx, ce in enumerate(entry[0]):
+                    ce.our_mrt[bcet] = res[0][idxx]
+                    ce.our_mda[bcet] = res[1][idxx]
+                    ce.our_mrda[bcet] = res[2][idxx]
+
+        # == Save the results
+        print("= Save data")
+        check_or_make_directory('output/2implicit')
+        write_data(f'output/1generation/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
+
+        print(time_now(), '= Store data =')
+
+        folder = "output/2implicit/"
+        output_filename = ("ce_ts_sched_u=" + str(args.u) +
+                           "_n=" + str(args.n) + "_g=" + str(args.g) + ".npz")
+        check_folder(folder)
+        np.savez(folder + output_filename, gen=ce_ts_sched)
+
+        print(time_now(), '= Done =')
 
     # single ecu plotting
 
