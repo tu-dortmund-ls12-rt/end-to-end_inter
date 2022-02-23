@@ -21,6 +21,8 @@ import utilities.event_simulator as es
 import utilities.analyzer as a
 import utilities.analyzer_our as a_our
 import utilities.evaluation as eva
+import utilities.task as task_package
+import utilities.plot as plot
 
 import time
 import sys
@@ -288,6 +290,68 @@ def G21_mrt(lst_flat):
     max_phase = max(t.phase for t in ts)
     hyper = ana.determine_hyper_period(ts)
     return ana.reaction_our(sched, ts, ce, max_phase, hyper)
+
+
+def davare_inter(inter_ch):
+    '''Davare analysis for one interconnected chain.'''
+    # make standard chain
+    ch = []
+    for entry in inter_ch:
+        if isinstance(entry, c.CauseEffectChain):
+            ch.extend(entry.chain)
+        elif isinstance(entry, task_package.Task):
+            ch.append(entry)
+    return ana.davare_single(c.CauseEffectChain(0, ch))
+
+
+def duerr_mrda_inter(inter_ch):
+    '''Duerr analysis for one interconnected chain.'''
+    # make standard chain
+    ch = []
+    for entry in inter_ch:
+        if isinstance(entry, c.CauseEffectChain):
+            ch.extend(entry.chain)
+        elif isinstance(entry, task_package.Task):
+            assert entry.message is True
+            ch.append(entry)
+    return ana.age_duerr_single(c.CauseEffectChain(0, ch))
+
+
+def duerr_mrt_inter(inter_ch):
+    '''Duerr analysis for one interconnected chain.'''
+    # make standard chain
+    ch = []
+    for entry in inter_ch:
+        if isinstance(entry, c.CauseEffectChain):
+            ch.extend(entry.chain)
+        elif isinstance(entry, task_package.Task):
+            assert entry.message is True
+            ch.append(entry)
+    return ana.reaction_duerr_single(c.CauseEffectChain(0, ch))
+
+
+def cutting_thm_implicit(inter_ch, attr_1, attr_2, bcet):
+    '''Cutting Theorem for implicit communication policy.'''
+    res = 0
+    for entry in inter_ch[:-1]:
+        if isinstance(entry, c.CauseEffectChain):
+            res += getattr(entry, attr_1)[bcet]
+        elif isinstance(entry, task_package.Task):
+            res += getattr(entry, 'period')
+            res += getattr(entry, 'rt')
+
+    res += getattr(inter_ch[-1], attr_2)[bcet]
+    return res
+
+
+def cutting_thm_mrda(inter_ch, bcet):
+    '''Our inter-ECU analysis when applying the Cutting theorem. (implicit communication)'''
+    return cutting_thm_implicit(inter_ch, 'our_mda', 'our_mrda', bcet)
+
+
+def cutting_thm_mrt(inter_ch, bcet):
+    '''Our inter-ECU analysis when applying the Cutting theorem. (implicit communication)'''
+    return cutting_thm_implicit(inter_ch, 'our_mrt', 'our_mrt', bcet)
 
 
 def our_mrt_mRda(lst, bcet):
@@ -1436,7 +1500,9 @@ if __name__ == '__main__':
 
     # =====args=====
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hs:u:b:n:p:")
+        opts, args = getopt.getopt(sys.argv[1:], "hs:u:b:n:p:",
+                                   ['help', 'switch=', 'util=', 'utilization=', 'bench=', 'benchmark=', 'proc=',
+                                    'processors=', 'number=', 'latency='])
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
@@ -1455,8 +1521,12 @@ if __name__ == '__main__':
             benchmark = str(arg)
         elif opt in ('-n', '--number'):
             number = int(arg)
-        elif opt in ('-p', '--proc', 'processors'):
+        elif opt in ('-p', '--proc', '--processors'):
             processors = int(arg)
+        elif opt in ('-l', '--latency'):
+            latency = str(arg)
+        else:
+            breakpoint()
 
     # single ecu system synthesis
     if code_switch == 1:
@@ -1482,7 +1552,7 @@ if __name__ == '__main__':
         assert len(task_sets) == len(ce_chains)
         ce_ts = list(zip(ce_chains, task_sets))
 
-        # == Schedule generation
+        # == Schedule generation  # TODO remove schedules from the tuples
         print('= Schedule generation')
 
         # Preparation: TDA (for Davare)
@@ -1524,55 +1594,18 @@ if __name__ == '__main__':
         check_or_make_directory('output/1generation')
         write_data(f'output/1generation/single_ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
 
-    # inter-ecu system synthesis
-    if code_switch == 2:
-
-        # == get all filenames
-        filenames = os.listdir('output/1generation/.')
-        pattern = re.compile('single.*\.pkl')
-        filenames = [file for file in filenames if pattern.match(file)]
-
-        # == load data and combine
-        single_ce_ts_sched_flat = []
-        for file in filenames:
-            single_ce_ts_sched_flat.extend(flatten(load_data(file)))
-
-        # == make interconnected chains
-        inter_chains = []
-        number_interconn_ce_chains = 1  # TODO
-        for j in range(0, number_interconn_ce_chains):
-            com_tasks = comm.generate_communication_taskset(20, 10, 1000, True)  # generate communication tasks
-            com_tasks = list(np.random.choice(com_tasks, 4, replace=False))  # randomly choose 4
-            ces = list(np.random.choice(single_ce_ts_sched_flat, 5, replace=False))  # randomly choose 5
-            inter_chains.add([
-                ces[0],
-                com_tasks[0],
-                ces[1],
-                com_tasks[1],
-                ces[2],
-                com_tasks[2],
-                ces[3],
-                com_tasks[3],
-                ces[4],
-            ])
-            # End user notification
-            if j % 100 == 0:
-                print("\t", j)
-
-        # == Save the results
-        print("= Save data")
-        check_or_make_directory('output/1generation')
-        write_data(f'output/1generation/inter_chains.pkl', inter_chains)
-
 
     # single ecu experiment
-    elif code_switch == 3:
+    elif code_switch == 2:
 
         # == Check parameters
+        assert {'benchmark', 'util', 'number'}.issubset(locals())
+        assert benchmark in ('waters', 'uunifast')
+        assert 0.0 <= util <= 100.0
 
         # == Load data
         print(time_now(), "= Load data")
-        ce_ts_sched = load_data(f'output/1generation/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl')
+        ce_ts_sched = load_data(f'output/1generation/single_ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl')
         ce_ts_sched_flat = flatten(ce_ts_sched)  # this one is used
 
         # == Other analyses
@@ -1584,7 +1617,7 @@ if __name__ == '__main__':
         # ana = a.Analyzer()
         print(time_now(), '= Other analyses')
 
-        o_analyses = [
+        o_analyses = [  # tuple of name, function name, and attribute name of the object
             ['Davare', davare, 'davare'],
             ['Kloda', kloda, 'kloda'],
             ['D19: MDA', D19_mda, 'd19_mrda'],
@@ -1624,7 +1657,7 @@ if __name__ == '__main__':
             print(time_now(), 'BCET/WCET =', bcet)
 
             # Get result
-            with Pool(args.p) as p:
+            with Pool(processors) as p:
                 res_our = p.starmap(our_mrt_mRda, zip(
                     ce_ts_sched, itertools.repeat(bcet)))
 
@@ -1638,13 +1671,190 @@ if __name__ == '__main__':
 
         # == Save the results
         print("= Save data")
-        check_or_make_directory('output/2implicit')
-        write_data(f'output/2implicit/ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
+        check_or_make_directory('output/2results')
+        write_data(f'output/2results/single_ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
 
-    # single ecu plotting
+    # inter-ecu system synthesis
+    if code_switch == 3:
+        # Note: make sure that single ECU analysis was done beforehand
+        # == add variables
+        number_interconn_ce_chains = 100  # TODO adjust
+
+        # == check parameters
+        assert {'benchmark', }.issubset(locals())
+        assert benchmark in ('waters', 'uunifast')
+
+        # == get all filenames
+        filenames = os.listdir('output/2results/.')
+        pattern = re.compile(f'single.*{benchmark=}.*\.pkl')
+        filenames = [file for file in filenames if pattern.match(file)]
+
+        # == load data and combine
+        single_ce_ts_sched_flat = []
+        for file in filenames:
+            single_ce_ts_sched_flat.extend(flatten(load_data('output/2results/' + file)))
+
+        # == make interconnected chains
+        inter_chains = []
+        for j in range(0, number_interconn_ce_chains):
+            com_tasks = comm.generate_communication_taskset(20, 10, 1000, True)  # generate communication tasks
+            com_tasks = list(np.random.choice(com_tasks, 4, replace=False))  # randomly choose 4
+            choice_ces = np.random.choice(len(single_ce_ts_sched_flat), 5, replace=False)
+            ces = [single_ce_ts_sched_flat[entry][0] for entry in choice_ces]  # randomly choose 5
+            inter_chains.append([
+                ces[0],
+                com_tasks[0],
+                ces[1],
+                com_tasks[1],
+                ces[2],
+                com_tasks[2],
+                ces[3],
+                com_tasks[3],
+                ces[4],
+            ])
+            # End user notification
+            if j % 100 == 0:
+                print("\t", j)
+
+        # == Save the results
+        print("= Save data")
+        check_or_make_directory('output/1generation')
+        write_data(f'output/1generation/inter_chains_{benchmark=}.pkl', inter_chains)
 
     # inter-ecu experiment
+    if code_switch == 4:
+        # == Check parameters
+        assert {'benchmark', }.issubset(locals())
+        assert benchmark in ('waters', 'uunifast')
+
+        # == Load data
+        print(time_now(), "= Load data")
+        inter_chains = load_data(f'output/1generation/inter_chains_{benchmark=}.pkl')
+
+        # == Analyses
+        print(time_now(), "= Analyses")
+
+        # davare
+        with Pool(processors) as p:
+            res_davare = p.map(davare_inter, inter_chains)
+
+        # duerr MRDA
+        with Pool(processors) as p:
+            res_duerr_mrda = p.map(duerr_mrda_inter, inter_chains)
+
+        # duerr MRT
+        with Pool(processors) as p:
+            res_duerr_mrt = p.map(duerr_mrt_inter, inter_chains)
+
+        # Our (apply cutting)
+        res_our_mrda = dict()
+        res_our_mrt = dict()
+
+        bcet_ratios = [1.0, 0.7, 0.3, 0.0]
+
+        for bcet in bcet_ratios:
+            with Pool(processors) as p:
+                res_our_mrda[bcet] = p.starmap(cutting_thm_mrda, zip(inter_chains, itertools.repeat(bcet)))
+                res_our_mrt[bcet] = p.starmap(cutting_thm_mrt, zip(inter_chains, itertools.repeat(bcet)))
+
+        results_mrda = {
+            'D07': res_davare,
+            'D19': res_duerr_mrda,
+            'Our': res_our_mrda,
+        }
+
+        results_mrt = {
+            'D07': res_davare,
+            'D19': res_duerr_mrt,
+            'Our': res_our_mrt
+        }
+
+        # == Save the results
+        print(time_now(), "= Save data")
+        check_or_make_directory('output/2results')
+        write_data(f'output/2results/results_inter_{benchmark=}_mrda.pkl', results_mrda)
+        write_data(f'output/2results/results_inter_{benchmark=}_mrt.pkl', results_mrt)
+
+    # single ecu plotting
+    if code_switch == 5:
+        # == Check parameters
+        assert {'benchmark', }.issubset(locals())
+        assert benchmark in ('waters', 'uunifast')
+
+        # == get all filenames
+        filenames = os.listdir('output/2results/.')
+        pattern = re.compile(f'single.*{benchmark=}.*\.pkl')
+        filenames = [file for file in filenames if pattern.match(file)]
+
+        # == load data and combine
+        single_ce_ts_sched_flat = []
+        for file in filenames:
+            single_ce_ts_sched_flat.extend(flatten(load_data('output/2results/' + file)))
+
+        # == extract results:
+        extract_lst_mrda = [  # name, attribute name, item
+            ['D07', 'davare', None],  # Davare 2007
+            ['D19', 'd19_mrda', None],  # Duerr 2019
+            ['K18', 'kloda', None],  # Kloda 2018
+            ['0.0', 'our_mrda', 0.0],  # Our BCET = 0.0 WCET
+            ['0.3', 'our_mrda', 0.3],  # Our BCET = 0.3 WCET
+            ['0.7', 'our_mrda', 0.7],  # Our BCET = 0.7 WCET
+            ['1.0', 'our_mrda', 1.0],  # Our BCET = 1.0 WCET
+        ]
+        results_mrda = dict()
+        for ana_name, attr_name, item_name in extract_lst_mrda:
+            if item_name is not None:
+                results_mrda[ana_name] = [getattr(ce, attr_name)[item_name] for ce, *_ in single_ce_ts_sched_flat]
+            else:
+                results_mrda[ana_name] = [getattr(ce, attr_name) for ce, *_ in single_ce_ts_sched_flat]
+
+        extract_lst_mrt = [  # name, attribute name, item
+            ['D07', 'davare', None],  # Davare 2007
+            ['D19', 'd19_mrt', None],  # Duerr 2019
+            ['K18', 'kloda', None],  # Kloda 2018
+            ['0.0', 'our_mrt', 0.0],  # Our BCET = 0.0 WCET
+            ['0.3', 'our_mrt', 0.3],  # Our BCET = 0.3 WCET
+            ['0.7', 'our_mrt', 0.7],  # Our BCET = 0.7 WCET
+            ['1.0', 'our_mrt', 1.0],  # Our BCET = 1.0 WCET
+        ]
+        results_mrt = dict()
+        for ana_name, attr_name, item_name in extract_lst_mrt:
+            if item_name is not None:
+                results_mrt[ana_name] = [getattr(ce, attr_name)[item_name] for ce, *_ in single_ce_ts_sched_flat]
+            else:
+                results_mrt[ana_name] = [getattr(ce, attr_name) for ce, *_ in single_ce_ts_sched_flat]
+
+        # == Plot results_mrda and results_mrt
+        plot.plot_baseline_reduction(results_mrda, 'D07', 'results_mrda.pdf')
+        plot.plot_baseline_reduction(results_mrt, 'D07', 'results_mrt.pdf')
+
+        plot.plot_baseline_logscale(results_mrda, 'D07', 'results_log_mrda.pdf')
+        plot.plot_baseline_logscale(results_mrt, 'D07', 'results_log_mrt.pdf')
 
     # inter-ecu potting
+    if code_switch == 6:
+        # == Check parameters
+        assert {'benchmark', }.issubset(locals())
+        assert benchmark in ('waters', 'uunifast')
 
-    # main()
+        # == Load data
+        print(time_now(), "= Load data")
+        results_mrda = load_data(f'output/2results/results_inter_{benchmark=}_mrda.pkl')
+        results_mrt = load_data(f'output/2results/results_inter_{benchmark=}_mrt.pkl')
+
+        bcet_ratios = [0.0, 0.3, 0.7, 1.0]
+
+        our_mrda = results_mrda.pop('Our')
+        for bcet in bcet_ratios:
+            results_mrda[str(bcet)] = our_mrda[bcet]
+
+        our_mrt = results_mrt.pop('Our')
+        for bcet in bcet_ratios:
+            results_mrt[str(bcet)] = our_mrt[bcet]
+
+        # == Plot results_mrda and results_mrt
+        plot.plot_baseline_reduction(results_mrda, 'D07', 'results_inter_mrda.pdf')
+        plot.plot_baseline_reduction(results_mrt, 'D07', 'results_inter_mrt.pdf')
+
+        plot.plot_baseline_logscale(results_mrda, 'D07', 'results_inter_log_mrda.pdf')
+        plot.plot_baseline_logscale(results_mrt, 'D07', 'results_inter_log_mrt.pdf')
