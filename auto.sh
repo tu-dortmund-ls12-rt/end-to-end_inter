@@ -9,15 +9,15 @@ nmb_interchains=10000
 # Single ECU Synthesis
 for ut in $utils
 do
-  python3 main.py --switch=1 --util=$ut -number=$nmb_tasksets --bench='waters'
-  python3 main.py --switch=1 --util=$ut -number=$nmb_tasksets --bench='uunifast'
+  python3 main.py --switch=1 --util=$ut --number=$nmb_tasksets --bench='waters' --proc=$nmb_processes
+  python3 main.py --switch=1 --util=$ut --number=$nmb_tasksets --bench='uunifast' --proc=$nmb_processes
 done
 
 # Single ECU experiments
 for ut in $utils
 do
-  python3 main.py --switch=2 --util=$ut -number=$nmb_tasksets --bench='waters' --proc=$nmb_processes
-  python3 main.py --switch=2 --util=$ut -number=$nmb_tasksets --bench='uunifast' --proc=$nmb_processes
+  python3 main.py --switch=2 --util=$ut --number=$nmb_tasksets --bench='waters' --proc=$nmb_processes
+  python3 main.py --switch=2 --util=$ut --number=$nmb_tasksets --bench='uunifast' --proc=$nmb_processes
 done
 
 # Inter ECU Synthesis
