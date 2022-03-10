@@ -231,15 +231,21 @@ def schedule_taskset_as_list(ce_ts):
     return list_res
 
 
-def flatten(ce_ts_sched):
-    '''Used to flatten the list ce_ts_sched'''
+def flatten3(ce_ts_sched):
+    """Used to flatten the list ce_ts_sched"""
     ce_ts_sched_flat = [(ce, ts, sched)
                         for ce_lst, ts, sched in ce_ts_sched for ce in ce_lst]
     return ce_ts_sched_flat
 
 
+def flatten(ce_ts):
+    """Used to flatten the list ce_ts_sched"""
+    ce_ts_flat = [(ce, ts) for ce_lst, ts in ce_ts for ce in ce_lst]
+    return ce_ts_flat
+
+
 def change_taskset_bcet(task_set, rat):
-    '''Copy task set and change the wcet/bcet of each task by a given ratio.'''
+    """Copy task set and change the wcet/bcet of each task by a given ratio."""
     new_task_set = [task.copy() for task in task_set]
     for task in new_task_set:
         task.wcet = math.ceil(rat * task.wcet)
@@ -249,7 +255,7 @@ def change_taskset_bcet(task_set, rat):
 
 
 def check_folder(name):
-    '''check if the folder exists, otherwise create it'''
+    """check if the folder exists, otherwise create it"""
     if not os.path.exists(name):
         os.makedirs(name)
 
@@ -373,6 +379,43 @@ def our_mrt_mRda(lst, bcet):
     return (mrt_res, mda_res, mrda_res)
 
 
+def our_mrt_mRda_lst(lst_ce_ts, bcet_lst, wcet=1.0):
+    """lst_ce_ts[0] = list of ce-chains, lst_ce_ts[1] = task set, bet_lst = [0.0, 0.3, 0.7, 1.0]"""
+    ce_lst = lst_ce_ts[0]
+    ts = lst_ce_ts[1]
+
+    # make schedules and store in dictionary
+    schedules_todo = bcet_lst
+    if wcet not in schedules_todo:
+        schedules_todo.append(wcet)
+
+    schedules = dict()  # schedules
+    ts_lst = dict()  # task sets
+
+    for et in schedules_todo:
+        ts_et = change_taskset_bcet(ts, et)  # task set with certain execution time
+        if et != 0:  # the dispatcher can only handle execution != 0
+            sched_et = schedule_task_set(ce_lst, ts_et, print_status=False)  # schedule with certain execution time
+        else:
+            sched_et = a_our.execution_zero_schedule(ts_et)
+        schedules[et] = sched_et
+        ts_lst[et] = ts_et
+
+    # do analysis for certain schedules
+    results = dict()  # results
+
+    for ce in ce_lst:
+        results[ce] = dict()
+        for bcet in bcet_lst:
+            results[ce][bcet] = dict()
+            ce_mrt = a_our.max_reac_local(ce, ts_lst[wcet], schedules[wcet], ts_lst[bcet], schedules[bcet])
+            ce_mda, ce_mrda = a_our.max_age_local(ce, ts_lst[wcet], schedules[wcet], ts_lst[bcet], schedules[bcet])
+            results[ce][bcet]['mrt'] = ce_mrt
+            results[ce][bcet]['mda'] = ce_mda
+            results[ce][bcet]['mrda'] = ce_mrda
+    return results
+
+
 #################
 # Main function #
 #################
@@ -434,46 +477,46 @@ if __name__ == '__main__':
         ce_ts = list(zip(ce_chains, task_sets))
 
         # == Schedule generation
-        print('= Schedule generation')
+        print('= Davare Analysis (preperation for schedule generation)')
 
         # Preparation: TDA (for Davare)
         # Only take those that are succesful.
         ce_ts = [entry for entry in ce_ts if TDA(entry[1])]
 
-        # Preparation: Davare (for schedule generation)
+        # Preparation: Davare (for schedule generation later on)
         ana = a.Analyzer()
         for ce, ts in ce_ts:
             ana.davare([ce])
 
-        # Main: Generate the schedule
-        with Pool(processors) as p:
-            schedules_lst = p.map(schedule_taskset_as_list, ce_ts)
-        schedules_dict = []
-        for idxx, sched in enumerate(schedules_lst):
-            schedules_dict.append(dict())
-            for idxxx, tsk in enumerate(ce_ts[idxx][1]):
-                schedules_dict[idxx][tsk] = sched[idxxx][:]
-
-        schedules = schedules_dict
-
-        # match ce_ts with schedules:
-        assert len(ce_ts) == len(schedules)
-        ce_ts_sched = [cets + (sched,)
-                       for cets, sched in zip(ce_ts, schedules)]
-        # Note: Each entry is now a 3-tuple of list of cause-effect chain,
-        # corresponding task set, and corresponding schedule
-        # - ce_ts_sched
-        #   - ce_ts_sched[0] --> one ECU
-        #     - ce_ts_sched[0][0] = set of ce-chains
-        #     - ce_ts_sched[0][1] = set of tasks (one ECU!)
-        #     - ce_ts_sched[0][2] = schedule of that ECU as dictionary
-        #   - ce_ts_sched[1]
-        #   - ...
+        # # Main: Generate the schedule
+        # with Pool(processors) as p:
+        #     schedules_lst = p.map(schedule_taskset_as_list, ce_ts)
+        # schedules_dict = []
+        # for idxx, sched in enumerate(schedules_lst):
+        #     schedules_dict.append(dict())
+        #     for idxxx, tsk in enumerate(ce_ts[idxx][1]):
+        #         schedules_dict[idxx][tsk] = sched[idxxx][:]
+        #
+        # schedules = schedules_dict
+        #
+        # # match ce_ts with schedules:
+        # assert len(ce_ts) == len(schedules)
+        # ce_ts_sched = [cets + (sched,)
+        #                for cets, sched in zip(ce_ts, schedules)]
+        # # Note: Each entry is now a 3-tuple of list of cause-effect chain,
+        # # corresponding task set, and corresponding schedule
+        # # - ce_ts_sched
+        # #   - ce_ts_sched[0] --> one ECU
+        # #     - ce_ts_sched[0][0] = set of ce-chains
+        # #     - ce_ts_sched[0][1] = set of tasks (one ECU!)
+        # #     - ce_ts_sched[0][2] = schedule of that ECU as dictionary
+        # #   - ce_ts_sched[1]
+        # #   - ...
 
         # == Save the results
         print("= Save data")
         check_or_make_directory('output/1generation')
-        write_data(f'output/1generation/single_ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
+        write_data(f'output/1generation/single_ce_ts_{util=}_{number=}_{benchmark=}.pkl', ce_ts)
 
     # == Single ECU Experiment ==
     elif code_switch == 2:
@@ -485,8 +528,8 @@ if __name__ == '__main__':
 
         # == Load data
         print(time_now(), "= Load data")
-        ce_ts_sched = load_data(f'output/1generation/single_ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl')
-        ce_ts_sched_flat = flatten(ce_ts_sched)  # this one is used
+        ce_ts = load_data(f'output/1generation/single_ce_ts_{util=}_{number=}_{benchmark=}.pkl')
+        ce_ts_flat = flatten(ce_ts)  # this one is used for other analyses
 
         # == Other analyses
         # - Davare
@@ -512,75 +555,88 @@ if __name__ == '__main__':
 
             # Get result
             with Pool(processors) as p:
-                results = p.map(fct, ce_ts_sched_flat)
+                results = p.map(fct, ce_ts_flat)
 
             # Set results
-            assert len(results) == len(ce_ts_sched_flat)
-            for res, entry in zip(results, ce_ts_sched_flat):
+            assert len(results) == len(ce_ts_flat)
+            for res, entry in zip(results, ce_ts_flat):
                 setattr(entry[0], attr_name, res)
 
         # == Our analysis
-
-        # Note: given some bcet ratio, make new schedule, analyse, put value to ce chain.
-
         print(time_now(), '= Our analysis')
 
-        bcet_ratios = [1.0, 0.7, 0.3, 0.0]
+        bcet_ratios = [1.0, 0.7, 0.3, 0.0]  # these should be analysed
 
         # Add dictionary for each cause-effect chain
-        for ce, _, _ in ce_ts_sched_flat:
+        for ce, _ in ce_ts_flat:
             ce.our_mrt = dict()
             ce.our_mda = dict()
             ce.our_mrda = dict()
 
-        for bcet in bcet_ratios:
-            print(time_now(), 'BCET/WCET =', bcet)
+        # Get our results
+        with Pool(processors) as p:
+            res_our = p.starmap(our_mrt_mRda_lst, zip(ce_ts, itertools.repeat(bcet_ratios)))
 
-            # Get result
-            with Pool(processors) as p:
-                res_our = p.starmap(our_mrt_mRda, zip(
-                    ce_ts_sched, itertools.repeat(bcet)))
+        # Set our results
+        assert len(res_our) == len(ce_ts)
+        for res, entry in zip(res_our, ce_ts):
+            for ce in entry[0]:
+                for bcet in bcet_ratios:
+                    ce.our_mrt[bcet] = res[ce][bcet]['mrt']
+                    ce.our_mda[bcet] = res[ce][bcet]['mda']
+                    ce.our_mrda[bcet] = res[ce][bcet]['mrda']
 
-            # Set results
-            assert len(res_our) == len(ce_ts_sched)
-            for res, entry in zip(res_our, ce_ts_sched):
-                for idxx, ce in enumerate(entry[0]):
-                    ce.our_mrt[bcet] = res[0][idxx]
-                    ce.our_mda[bcet] = res[1][idxx]
-                    ce.our_mrda[bcet] = res[2][idxx]
+        # for bcet in bcet_ratios:
+        #     print(time_now(), 'BCET/WCET =', bcet)
+        #
+        #     # Get result
+        #     with Pool(processors) as p:
+        #         res_our = p.starmap(our_mrt_mRda, zip(
+        #             ce_ts_sched, itertools.repeat(bcet)))
+        #
+        #     # Set results
+        #     assert len(res_our) == len(ce_ts_sched)
+        #     for res, entry in zip(res_our, ce_ts_sched):
+        #         for idxx, ce in enumerate(entry[0]):
+        #             ce.our_mrt[bcet] = res[0][idxx]
+        #             ce.our_mda[bcet] = res[1][idxx]
+        #             ce.our_mrda[bcet] = res[2][idxx]
 
         # == Save the results
         print("= Save data")
         check_or_make_directory('output/2results')
-        write_data(f'output/2results/single_ce_ts_sched_{util=}_{number=}_{benchmark=}.pkl', ce_ts_sched)
+        write_data(f'output/2results/single_ce_ts_{util=}_{number=}_{benchmark=}.pkl', ce_ts)
 
     # == Inter-ECU System Synthesis ==
     if code_switch == 3:
         # Note: make sure that single ECU analysis was done beforehand
 
         # == check parameters
-        assert {'benchmark', number}.issubset(locals())
+        assert {'benchmark', 'number'}.issubset(locals())
         assert benchmark in ('waters', 'uunifast')
 
         number_interconn_ce_chains = number
 
         # == get all filenames
-        filenames = os.listdir('output/2results/.')
+        input_dir = 'output/2results/'
+        filenames = os.listdir(input_dir)
         pattern = re.compile(f'single.*{benchmark=}.*\.pkl')
-        filenames = [file for file in filenames if pattern.match(file)]
+        filenames = [file for file in filenames if
+                     pattern.match(file)]
+        filenames.sort()  # sort alphabetically (=> no random behavior when loading)
 
         # == load data and combine
-        single_ce_ts_sched_flat = []
+        single_ce_ts_flat = []
         for file in filenames:
-            single_ce_ts_sched_flat.extend(flatten(load_data('output/2results/' + file)))
+            single_ce_ts_flat.extend(flatten(load_data(input_dir + file)))
 
         # == make interconnected chains
         inter_chains = []
         for j in range(0, number_interconn_ce_chains):
             com_tasks = comm.generate_communication_taskset(20, 10, 1000, True)  # generate communication tasks
             com_tasks = list(np.random.choice(com_tasks, 4, replace=False))  # randomly choose 4
-            choice_ces = np.random.choice(len(single_ce_ts_sched_flat), 5, replace=False)
-            ces = [single_ce_ts_sched_flat[entry][0] for entry in choice_ces]  # randomly choose 5
+            choice_ces = np.random.choice(len(single_ce_ts_flat), 5, replace=False)
+            ces = [single_ce_ts_flat[entry][0] for entry in choice_ces]  # randomly choose 5
             inter_chains.append([
                 ces[0],
                 com_tasks[0],
@@ -667,9 +723,9 @@ if __name__ == '__main__':
         filenames = [file for file in filenames if pattern.match(file)]
 
         # == load data and combine
-        single_ce_ts_sched_flat = []
+        single_ce_ts_flat = []
         for file in filenames:
-            single_ce_ts_sched_flat.extend(flatten(load_data('output/2results/' + file)))
+            single_ce_ts_flat.extend(flatten(load_data('output/2results/' + file)))
 
         # == extract results:
         extract_lst_mrda = [  # name, attribute name, item
@@ -684,9 +740,9 @@ if __name__ == '__main__':
         results_mrda = dict()
         for ana_name, attr_name, item_name in extract_lst_mrda:
             if item_name is not None:
-                results_mrda[ana_name] = [getattr(ce, attr_name)[item_name] for ce, *_ in single_ce_ts_sched_flat]
+                results_mrda[ana_name] = [getattr(ce, attr_name)[item_name] for ce, _ in single_ce_ts_flat]
             else:
-                results_mrda[ana_name] = [getattr(ce, attr_name) for ce, *_ in single_ce_ts_sched_flat]
+                results_mrda[ana_name] = [getattr(ce, attr_name) for ce, _ in single_ce_ts_flat]
 
         extract_lst_mrt = [  # name, attribute name, item
             ['D07', 'davare', None],  # Davare 2007
@@ -700,17 +756,17 @@ if __name__ == '__main__':
         results_mrt = dict()
         for ana_name, attr_name, item_name in extract_lst_mrt:
             if item_name is not None:
-                results_mrt[ana_name] = [getattr(ce, attr_name)[item_name] for ce, *_ in single_ce_ts_sched_flat]
+                results_mrt[ana_name] = [getattr(ce, attr_name)[item_name] for ce, _ in single_ce_ts_flat]
             else:
-                results_mrt[ana_name] = [getattr(ce, attr_name) for ce, *_ in single_ce_ts_sched_flat]
+                results_mrt[ana_name] = [getattr(ce, attr_name) for ce, _ in single_ce_ts_flat]
 
         # == Plot results_mrda and results_mrt
         check_or_make_directory('output/3plots')
-        plot.plot_reduction(results_mrda, 'D07', 'output/3plots/single_red_mrda.pdf')
-        plot.plot_reduction(results_mrt, 'D07', 'output/3plots/single_red_mrt.pdf')
+        plot.plot_reduction(results_mrda, 'D07', f'output/3plots/single_red_mrda_{benchmark=}.pdf')
+        plot.plot_reduction(results_mrt, 'D07', f'output/3plots/single_red_mrt_{benchmark=}.pdf')
 
-        plot.plot_gap_reduction(results_mrda, 'D07', 'output/3plots/single_gap_mrda.pdf')
-        plot.plot_gap_reduction(results_mrt, 'D07', 'output/3plots/single_gap_mrt.pdf')
+        plot.plot_gap_reduction(results_mrda, 'D07', '1.0', f'output/3plots/single_gap_mrda_{benchmark=}.pdf')
+        plot.plot_gap_reduction(results_mrt, 'D07', '1.0', f'output/3plots/single_gap_mrt_{benchmark=}.pdf')
 
     # inter-ecu potting
     if code_switch == 6:
@@ -735,5 +791,5 @@ if __name__ == '__main__':
 
         # == Plot results_mrda and results_mrt
         check_or_make_directory('output/3plots')
-        plot.plot_reduction(results_mrda, 'D07', 'output/3plots/inter_red_mrda.pdf')
-        plot.plot_reduction(results_mrt, 'D07', 'output/3plots/inter_red_mrt.pdf')
+        plot.plot_reduction(results_mrda, 'D07', f'output/3plots/inter_red_mrda_{benchmark=}.pdf')
+        plot.plot_reduction(results_mrt, 'D07', f'output/3plots/inter_red_mrt_{benchmark= }.pdf')
