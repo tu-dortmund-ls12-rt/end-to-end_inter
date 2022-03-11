@@ -383,6 +383,7 @@ def our_mrt_mRda_lst(lst_ce_ts, bcet_lst, wcet=1.0):
     """lst_ce_ts[0] = list of ce-chains, lst_ce_ts[1] = task set, bet_lst = [0.0, 0.3, 0.7, 1.0]"""
     ce_lst = lst_ce_ts[0]
     ts = lst_ce_ts[1]
+    wcet = 1.0
 
     # make schedules and store in dictionary
     schedules_todo = bcet_lst
@@ -393,7 +394,10 @@ def our_mrt_mRda_lst(lst_ce_ts, bcet_lst, wcet=1.0):
     ts_lst = dict()  # task sets
 
     for et in schedules_todo:
-        ts_et = change_taskset_bcet(ts, et)  # task set with certain execution time
+        if et == 1.0:
+            ts_et = ts  # otherwise tasks in the chain can not be allocated
+        else:
+            ts_et = change_taskset_bcet(ts, et)  # task set with certain execution time
         if et != 0:  # the dispatcher can only handle execution != 0
             sched_et = schedule_task_set(ce_lst, ts_et, print_status=False)  # schedule with certain execution time
         else:
@@ -402,17 +406,19 @@ def our_mrt_mRda_lst(lst_ce_ts, bcet_lst, wcet=1.0):
         ts_lst[et] = ts_et
 
     # do analysis for certain schedules
-    results = dict()  # results
+    results = []  # results
 
     for ce in ce_lst:
-        results[ce] = dict()
+        results_ce = dict()
         for bcet in bcet_lst:
-            results[ce][bcet] = dict()
+            results_ce[bcet] = dict()
+            # breakpoint()
             ce_mrt = a_our.max_reac_local(ce, ts_lst[wcet], schedules[wcet], ts_lst[bcet], schedules[bcet])
             ce_mda, ce_mrda = a_our.max_age_local(ce, ts_lst[wcet], schedules[wcet], ts_lst[bcet], schedules[bcet])
-            results[ce][bcet]['mrt'] = ce_mrt
-            results[ce][bcet]['mda'] = ce_mda
-            results[ce][bcet]['mrda'] = ce_mrda
+            results_ce[bcet]['mrt'] = ce_mrt
+            results_ce[bcet]['mda'] = ce_mda
+            results_ce[bcet]['mrda'] = ce_mrda
+        results.append(results_ce)
     return results
 
 
@@ -574,17 +580,21 @@ if __name__ == '__main__':
             ce.our_mrda = dict()
 
         # Get our results
+        # res_our = []
+        # for entry in ce_ts:
+        #     res_our.append(our_mrt_mRda_lst(entry, bcet_ratios))
         with Pool(processors) as p:
             res_our = p.starmap(our_mrt_mRda_lst, zip(ce_ts, itertools.repeat(bcet_ratios)))
 
         # Set our results
         assert len(res_our) == len(ce_ts)
         for res, entry in zip(res_our, ce_ts):
-            for ce in entry[0]:
+            for idxx, ce in enumerate(entry[0]):
                 for bcet in bcet_ratios:
-                    ce.our_mrt[bcet] = res[ce][bcet]['mrt']
-                    ce.our_mda[bcet] = res[ce][bcet]['mda']
-                    ce.our_mrda[bcet] = res[ce][bcet]['mrda']
+                    # breakpoint()
+                    ce.our_mrt[bcet] = res[idxx][bcet]['mrt']
+                    ce.our_mda[bcet] = res[idxx][bcet]['mda']
+                    ce.our_mrda[bcet] = res[idxx][bcet]['mrda']
 
         # for bcet in bcet_ratios:
         #     print(time_now(), 'BCET/WCET =', bcet)

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 
 nmb_processes="$1" # number of concurrent processes
-utils="50 60 70 80 90"
+utils="70 80 90"  # "50 60 70 80 90"
 nmb_tasksets=1000
 nmb_interchains=10000
 
 
 # Single ECU Synthesis
-for ut in $utils
-do
-  python3 main.py --switch=1 --util=$ut --number=$nmb_tasksets --bench='waters' --proc=$nmb_processes
-  python3 main.py --switch=1 --util=$ut --number=$nmb_tasksets --bench='uunifast' --proc=$nmb_processes
-done
+#for ut in $utils
+#do
+#  python3 main.py --switch=1 --util=$ut --number=$nmb_tasksets --bench='waters' --proc=$nmb_processes
+#  python3 main.py --switch=1 --util=$ut --number=$nmb_tasksets --bench='uunifast' --proc=$nmb_processes
+#done
 
 # Single ECU experiments
 for ut in $utils
