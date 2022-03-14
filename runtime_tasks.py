@@ -14,6 +14,7 @@ import utilities.analyzer as ana
 import utilities.event_simulator as es
 import signal
 import main as main_file
+from statistics import median
 
 debug_flag = False  # flag to have breakpoint() when errors occur
 
@@ -307,9 +308,13 @@ def plot_results(
     hyperperiods = [1000, 2000, 3000, 4000]
 
     # Prepare result_values.
-    result_values = []  # list of lists of results
+    result_values_max = []  # list of lists of results
     for _ in hyperperiods:
-        result_values.append([])
+        result_values_max.append([])
+
+    result_values_med = []  # list of lists of results
+    for _ in hyperperiods:
+        result_values_med.append([])
 
     for num_tasks in task_numbers:
         try:
@@ -359,18 +364,31 @@ def plot_results(
 
         # Choose maximal value among them.
         for idx in range(len(filtered_results)):
-            result_values[idx].append(max(filtered_results[idx]))
+            result_values_max[idx].append(max(filtered_results[idx]))
+
+        # Choose median value among them.
+        for idx in range(len(filtered_results)):
+            result_values_med[idx].append(median(filtered_results[idx]))
 
     ###
     # Plot result.
     ###
     draw_points(
         task_numbers,
-        result_values,
+        result_values_max,
         hyperperiods,
-        "output/runtime/runtime_tasks.pdf",
+        "output/runtime/runtime_tasks_max.pdf",
         xaxis_label="#Tasks per set",
-        yaxis_label="Runtime [s]",
+        yaxis_label="Maximal runtime [s]",
+        convert=True)
+
+    draw_points(
+        task_numbers,
+        result_values_med,
+        hyperperiods,
+        "output/runtime/runtime_tasks_med.pdf",
+        xaxis_label="#Tasks per set",
+        yaxis_label="Median runtime [s]",
         convert=True)
 
 
