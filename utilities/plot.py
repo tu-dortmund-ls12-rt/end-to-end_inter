@@ -1,10 +1,8 @@
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
-                               AutoMinorLocator)
-import numpy as np
+from matplotlib.ticker import (AutoMinorLocator)
 
 
-def plot(data, filename, xticks=None, title='', yticks=None, ylimits=None, yscale='linear'):
+def plot(data, filename, xticks=None, title='', yticks=None, ylimits=None, yscale='linear', yaxis_label=""):
     fig, ax = plt.subplots()
     ax.set_title(title)
     ax.boxplot(data,
@@ -27,17 +25,21 @@ def plot(data, filename, xticks=None, title='', yticks=None, ylimits=None, yscal
     ax.tick_params(axis='x', rotation=0, labelsize=20)
     ax.tick_params(axis='y', rotation=0, labelsize=20)
 
+    ax.set_ylabel(yaxis_label, fontsize=20)
+
     plt.grid(True, color='lightgray', which='both', axis='y', linestyle='-')
     ax.yaxis.set_minor_locator(AutoMinorLocator())
     ax.tick_params(which='both', width=2)
     ax.tick_params(which='major', length=7)
+
+    plt.tight_layout()  # improve margins for example for yaxis_label
 
     # plt.show()
     fig.savefig(filename)
     print(f'plot {filename} created')
 
 
-def plot_reduction(data_dict, baseline, filename, title='', yticks=None, ylimits=None):
+def plot_reduction(data_dict, baseline, filename, title='', yticks=None, ylimits=None, yaxis_label="Latency reduction"):
     # == preprocess data
     data = []
     xticks = []
@@ -50,10 +52,10 @@ def plot_reduction(data_dict, baseline, filename, title='', yticks=None, ylimits
     if ylimits is None:
         ylimits = [0.0, 1.0]
 
-    plot(data, filename, xticks=xticks, title=title, yticks=yticks, ylimits=ylimits, yscale='linear')
+    plot(data, filename, xticks=xticks, title=title, yticks=yticks, ylimits=ylimits, yscale='linear', yaxis_label=yaxis_label)
 
 
-def plot_gap_reduction(data_dict, baseline0, baseline1, filename, title='', yticks=None, ylimits=None):
+def plot_gap_reduction(data_dict, baseline0, baseline1, filename, title='', yticks=None, ylimits=None, yaxis_label="Gap reduction"):
     """closes the gap between baseline0 and baseline1 by x percent."""
     # == preprocess data
     data = []
@@ -68,4 +70,4 @@ def plot_gap_reduction(data_dict, baseline0, baseline1, filename, title='', ytic
     if ylimits is None:
         ylimits = [0.0, 1.0]
 
-    plot(data, filename, xticks=xticks, title=title, yticks=yticks, ylimits=ylimits, yscale='linear')
+    plot(data, filename, xticks=xticks, title=title, yticks=yticks, ylimits=ylimits, yscale='linear', yaxis_label=yaxis_label)
