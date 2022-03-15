@@ -802,4 +802,4 @@ if __name__ == '__main__':
         # == Plot results_mrda and results_mrt
         check_or_make_directory('output/3plots')
         plot.plot_reduction(results_mrda, 'D07', f'output/3plots/inter_red_mrda_{benchmark=}.pdf')
-        plot.plot_reduction(results_mrt, 'D07', f'output/3plots/inter_red_mrt_{benchmark= }.pdf')
+        plot.plot_reduction(results_mrt, 'D07', f'output/3plots/inter_red_mrt_{benchmark=}.pdf')
