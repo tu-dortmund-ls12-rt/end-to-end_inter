@@ -36,9 +36,7 @@ def build_tree(chain: CauseEffectChain, current_position: int, current_job_idx: 
 
     # With this index the below property is safely fulfilled:
     next_job_idx = (
-        ceil(
-            (Dmax(current_task, current_position) - next_task.phase) / next_task.period
-        )
+        ceil((Dmax(current_task, current_job_idx) - next_task.phase) / next_task.period)
         - 1
     )
 
