@@ -45,11 +45,14 @@ def build_tree(chain: CauseEffectChain, current_position: int, current_job_idx: 
 
     next_job_idx = max(next_job_idx, 0)
 
+    # Note that in https://doi.org/10.1016/j.sysarc.2017.09.004 it is not specified what happens if there is no reachable job due to large phase of next_task.
+    # We assume that in that case the build_tree function returns a shorter tree than expected.
+    if Rmin(next_task, next_job_idx) >= Dmax(current_task, current_job_idx):
+        # No reachable job
+        return []
+
     while Rmin(next_task, next_job_idx + 1) < Dmax(current_task, current_job_idx):
         next_job_idx = next_job_idx + 1
-
-    # Note that in https://doi.org/10.1016/j.sysarc.2017.09.004 it is not specified what happens if there is no reachable job due to large phase of next_task.
-    # We assume that in that case the first job is still reachable.
 
     return [next_job_idx] + build_tree(chain, current_position + 1, next_job_idx)
 
