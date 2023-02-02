@@ -7,6 +7,7 @@ https://doi.org/10.1109/RTCSA.2016.41
 from utilities.chain import CauseEffectChain
 from utilities.task import Task
 from math import ceil
+from utilities.analyzer import Analyzer
 
 
 # ===== Help functions =====
@@ -15,7 +16,7 @@ def Rmin(tsk: Task, idx: int):
 
 
 def Rmax(tsk: Task, idx: int):
-    return Rmin(tsk, idx + 1) - tsk.wcet
+    return Rmin(tsk, idx) + tsk.rt - tsk.wcet
 
 
 def Dmin(tsk: Task, idx: int):
@@ -28,7 +29,7 @@ def Dmax(tsk: Task, idx: int):
 
 def build_tree(chain: CauseEffectChain, current_position: int, current_job_idx: int):
     if current_position + 1 >= chain.length():
-        return []
+        return [current_job_idx]
 
     current_task: Task = chain.chain[current_position]
     next_task: Task = chain.chain[current_position + 1]
@@ -54,9 +55,48 @@ def build_tree(chain: CauseEffectChain, current_position: int, current_job_idx: 
     while Rmin(next_task, next_job_idx + 1) < Dmax(current_task, current_job_idx):
         next_job_idx = next_job_idx + 1
 
-    return [next_job_idx] + build_tree(chain, current_position + 1, next_job_idx)
+    return [current_job_idx] + build_tree(chain, current_position + 1, next_job_idx)
 
 
 # ===== Analysis =====
 def mrda(chain: CauseEffectChain):
-    return
+    HP = Analyzer.determine_hyper_period(chain.chain)
+    max_phase = max([tsk.phase for tsk in chain.chain])
+
+    ages = []
+    ind_job = 0
+
+    while Rmin(chain.chain[0], ind_job) <= HP + max_phase:
+        tree = build_tree(chain, 0, ind_job)
+        if len(tree) == chain.length():
+            ages.append(
+                Rmax(chain.chain[-1], tree[-1])
+                + chain.chain[-1].wcet
+                - Rmin(chain.chain[0], tree[0])
+            )
+        ind_job = ind_job + 1
+
+    return max(ages)
+
+
+if __name__ == "__main__":
+    # Test 1:
+    tsk1 = Task(1, 0, 0, 1, 10, 10)
+    tsk2 = Task(2, 0, 0, 2, 50, 50)
+
+    tsk1.rt = 1
+    tsk2.rt = 3
+
+    chain = CauseEffectChain(1, [tsk1, tsk2])
+
+    t0 = build_tree(chain, 0, 0)
+    t1 = build_tree(chain, 0, 1)
+    t2 = build_tree(chain, 0, 2)
+    t3 = build_tree(chain, 0, 3)
+    t4 = build_tree(chain, 0, 4)
+    t5 = build_tree(chain, 0, 5)
+    t6 = build_tree(chain, 0, 6)
+
+    print(mrda(chain))
+
+    breakpoint()
