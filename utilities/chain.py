@@ -26,6 +26,7 @@ class CauseEffectChain:
         self.inter_our_red_age = 0  # Our reduced max data age for interconn
         self.inter_our_react = 0  # Our max reaction time for interconn
         self.kloda = 0  # Kloda
+        self.becker = 0  # MRDA analysis from Becker
 
     def length(self):
         """Compute the length of a cause-effect chain."""
@@ -38,5 +39,7 @@ class CauseEffectChain:
         The disorder of a chain is the number of priority inversions along
         the data propagation path.
         """
-        return sum(1 if self.chain[i].priority > self.chain[i+1].priority
-                   else 0 for i in range(len(self.chain)-1))
+        return sum(
+            1 if self.chain[i].priority > self.chain[i + 1].priority else 0
+            for i in range(len(self.chain) - 1)
+        )
