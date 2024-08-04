@@ -6,7 +6,7 @@ for IEEE TC 2022.
 
 The output generated for the evaluation can be found here: TBD
 
-TO BE UPDATED:
+TO BE UPDATED: 
 
 # End-To-End Timing Analysis
 
