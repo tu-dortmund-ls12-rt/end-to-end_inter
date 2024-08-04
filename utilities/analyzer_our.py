@@ -179,7 +179,7 @@ def max_reac_local(chain, task_set_wcet, schedule_wcet, task_set_bcet, schedule_
     return max_length
 
 
-def max_age_local(chain, task_set_wcet, schedule_wcet, task_set_bcet, schedule_bcet):
+def max_age_local(chain, task_set_wcet, schedule_wcet, task_set_bcet, schedule_bcet, calc_mda=True, calc_mrda=True):
     '''Main method for maximum data age.
     Returns a list of two values. First is the maximum data age bound, second is
     the maximum REDUCED data age bound.
@@ -251,27 +251,33 @@ def max_age_local(chain, task_set_wcet, schedule_wcet, task_set_bcet, schedule_b
 
         # breakpoint()
 
-    # maximal length
-    max_length_compl = max(
-        [ana.len_abstr(abstr, task_set_wcet[index_chain[-1]],
-                       task_set_bcet[index_chain[0]]) for abstr in complete_abstr] + [0]
-    )
-    max_length_incompl = max(
-        [ana.incomplete_bound(abstr, task_set_wcet[index_chain[-1]],
-                              task_set_bcet[index_chain[0]]) for abstr in incomplete_abstr] + [0]
-    )
-    max_length = max(max_length_compl, max_length_incompl)
+    if calc_mda:
+        # maximal length
+        max_length_compl = max(
+            [ana.len_abstr(abstr, task_set_wcet[index_chain[-1]],
+                        task_set_bcet[index_chain[0]]) for abstr in complete_abstr] + [0]
+        )
+        max_length_incompl = max(
+            [ana.incomplete_bound(abstr, task_set_wcet[index_chain[-1]],
+                                task_set_bcet[index_chain[0]]) for abstr in incomplete_abstr] + [0]
+        )
+        max_length = max(max_length_compl, max_length_incompl)
+    else: 
+        max_length = 0
 
-    # maximal reduced length
-    max_length_compl_red = max(
-        [ana.len_abstr_reduced(abstr, task_set_wcet[index_chain[-1]],
-                               task_set_bcet[index_chain[0]]) for abstr in complete_abstr] + [0]
-    )
-    max_length_incompl_red = max(
-        [ana.incomplete_bound_reduced(abstr, task_set_wcet[index_chain[-1]],
-                                      task_set_bcet[index_chain[0]]) for abstr in incomplete_abstr] + [0]
-    )
-    max_length_red = max(max_length_compl_red, max_length_incompl_red)
+    if calc_mrda:
+        # maximal reduced length
+        max_length_compl_red = max(
+            [ana.len_abstr_reduced(abstr, task_set_wcet[index_chain[-1]],
+                                task_set_bcet[index_chain[0]]) for abstr in complete_abstr] + [0]
+        )
+        max_length_incompl_red = max(
+            [ana.incomplete_bound_reduced(abstr, task_set_wcet[index_chain[-1]],
+                                        task_set_bcet[index_chain[0]]) for abstr in incomplete_abstr] + [0]
+        )
+        max_length_red = max(max_length_compl_red, max_length_incompl_red)
+    else:
+        max_length_red = 0
 
     chain.our_new_local_mda = max_length
     chain.our_new_local_mrda = max_length_red

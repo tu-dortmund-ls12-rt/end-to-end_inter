@@ -22,10 +22,10 @@ def plot(data, filename, xticks=None, title='', yticks=None, ylimits=None, yscal
 
     plt.yscale(yscale)
 
-    ax.tick_params(axis='x', rotation=0, labelsize=20)
-    ax.tick_params(axis='y', rotation=0, labelsize=20)
+    ax.tick_params(axis='x', rotation=0, labelsize=22)
+    ax.tick_params(axis='y', rotation=0, labelsize=22)
 
-    ax.set_ylabel(yaxis_label, fontsize=20)
+    ax.set_ylabel(yaxis_label, fontsize=22)
 
     plt.grid(True, color='lightgray', which='both', axis='y', linestyle='-')
     ax.yaxis.set_minor_locator(AutoMinorLocator())

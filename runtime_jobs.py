@@ -199,7 +199,8 @@ def main():
             # analyzer.reaction_our(schedule, task_set, ce_chain, max_phase,
             #                       hyperperiod)
 
-            main_file.our_mrt_mRda_lst([[ce_chain], task_set], [0.5])  # apply our analysis
+            # main_file.our_mrt_mRda_lst([[ce_chain], task_set], [0.5])  # apply our analysis
+            main_file.our_mrt_mRda_lst([[ce_chain], task_set], [0.5], calc_mda=False, calc_mrda=True)  # apply our analysis (only MRT(=E2E Latency due to equivalence) and MRDA)
 
             # Stop timer.
             tock = time.time()
@@ -312,7 +313,7 @@ def draw_points(
         results = list(zip(*results))
 
     # Size parameters:
-    plt.rcParams.update({'font.size': 18})
+    plt.rcParams.update({'font.size': 17})
     plt.rcParams.update({'figure.subplot.top': 0.99})
     plt.rcParams.update({'figure.subplot.bottom': 0.25})
     plt.rcParams.update({'figure.subplot.left': 0.18})
@@ -323,11 +324,11 @@ def draw_points(
     fig1, ax1 = plt.subplots()
     if ylimits is not None:
         ax1.set_ylim(ylimits)
-    ax1.set_ylabel(yaxis_label, fontsize=20)
+    ax1.set_ylabel(yaxis_label, fontsize=22)
 
     plt.plot(results[0], results[1], 'o')
 
-    ax1.set_xlabel(xaxis_label, fontsize=20)
+    ax1.set_xlabel(xaxis_label, fontsize=22)
     plt.tight_layout()
 
     # Save.

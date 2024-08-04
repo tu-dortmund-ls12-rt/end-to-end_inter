@@ -395,7 +395,7 @@ def our_mrt_mRda(lst, bcet):
     return (mrt_res, mda_res, mrda_res)
 
 
-def our_mrt_mRda_lst(lst_ce_ts, bcet_lst, wcet=1.0):
+def our_mrt_mRda_lst(lst_ce_ts, bcet_lst, wcet=1.0, calc_mda=True, calc_mrda=True):
     """lst_ce_ts[0] = list of ce-chains, lst_ce_ts[1] = task set, bet_lst = [0.0, 0.3, 0.7, 1.0]"""
     ce_lst = lst_ce_ts[0]
     ts = lst_ce_ts[1]
@@ -435,7 +435,7 @@ def our_mrt_mRda_lst(lst_ce_ts, bcet_lst, wcet=1.0):
                 ce, ts_lst[wcet], schedules[wcet], ts_lst[bcet], schedules[bcet]
             )
             ce_mda, ce_mrda = a_our.max_age_local(
-                ce, ts_lst[wcet], schedules[wcet], ts_lst[bcet], schedules[bcet]
+                ce, ts_lst[wcet], schedules[wcet], ts_lst[bcet], schedules[bcet], calc_mda=calc_mda, calc_mrda=calc_mrda
             )
             results_ce[bcet]["mrt"] = ce_mrt
             results_ce[bcet]["mda"] = ce_mda

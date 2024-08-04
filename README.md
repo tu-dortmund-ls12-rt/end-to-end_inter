@@ -1,20 +1,15 @@
-The repository is used to reproduce the evaluation from
-
-*Journal Version of: Timing analysis of asynchronized distributed cause-effect chains*
-
-for IEEE TC 2022.
-
-The output generated for the evaluation can be found here: TBD
-
-TO BE UPDATED: 
-
-# End-To-End Timing Analysis
+# Compositional End-To-End Timing Analysis
 
 The repository is used to reproduce the evaluation from
 
-*Timing Analysis of Asynchronized Distributed Cause-Effect Chains*
+*Compositional Timing Analysis of Asynchronized Distributed Cause-effect Chains*
 
-for RTAS 2021.
+published at IEEE TECS 2023.
+This is a Journal Version of the paper: 
+*Timing analysis of asynchronized distributed cause-effect chains*
+presented at RTAS 2021.
+
+Specifically, in this version, the plots of the dissertation of Mario Günzel are generation.
 
 This document is organized as follows:
 
@@ -26,9 +21,11 @@ This document is organized as follows:
 
 ## Environment Setup
 
-### Requirements
+### STEP1: Install common softward
 
-Some common software should be installed:
+This evaluation uses Python3.7 (newer versions might work as well) and screen.
+
+To install common software, use:
 
 ```
 sudo apt-get install software-properties-common git screen python3.7
@@ -42,7 +39,43 @@ sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt-get update
 ```
 
-To run the experiments Python 3.7 is required (Python 3.9 might also work). Moreover, the following packages are
+### STEP2: Clone Github Script
+
+This can be done by using 
+
+```
+git clone <RepoURL>
+```
+
+### STEP3: Start Python Venv and Install Requirements
+
+Start a python venv using 
+```
+python3.7 -m venv venv 
+source venv/bin/activate
+```
+
+Load requirements:
+
+```
+pip install -r requirements.txt
+```
+
+
+## Execute Experiments
+
+Make sure that the virtual environment is loaded (every time before a script is run).
+```
+source venv/bin/activate
+```
+
+
+
+
+
+### STEP2: Python Requirements
+
+ Moreover, the following packages are
 required:
 
 ```
