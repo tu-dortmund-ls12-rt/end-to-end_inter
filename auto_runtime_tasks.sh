@@ -22,7 +22,7 @@ date
 num_tries=100  # number of runs
 runs_per_screen=10  # number of runs per screen
 
-num_task_ind=19  # amount of different task numbers
+num_task_ind=1 #19  # amount of different task numbers
 
 hypers=( 0 1000 2000 3000 4000 )  # hyperperiods to be checked
 len_hypers=${#hypers[@]}  # number of elements in hypers
